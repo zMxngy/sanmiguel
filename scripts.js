@@ -1,0 +1,1963 @@
+/* ==========================================================================
+   FASE 4 (PROMPT v5.2) · CONTROL ESTRICTO DE NAVEGACIÓN Y SCROLL
+   Skills: best-practices, accessibility
+   ========================================================================== */
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+
+function handlePageInitialScroll() {
+  const hash = window.location.hash;
+  const search = window.location.search;
+  const hasCotizadorHash = hash === '#cotizador';
+  const hasServiceParam = search.includes('servicio=');
+
+  if (hasCotizadorHash || hasServiceParam) {
+    setTimeout(() => {
+      const cotizador = document.getElementById('cotizador');
+      if (cotizador) {
+        cotizador.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 150);
+  } else if (!hash || hash === '#') {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', handlePageInitialScroll);
+} else {
+  handlePageInitialScroll();
+}
+window.addEventListener('load', () => {
+  const hash = window.location.hash;
+  const search = window.location.search;
+  if (!hash && !search.includes('servicio=')) {
+    window.scrollTo(0, 0);
+  }
+});
+
+/**
+ * Trasteos y Mudanzas San Miguel - Motor de Interacciones y Cotizador Unificado (v3.0)
+ * Normas: Emil Kowalski UI Polish, WCAG 2.2 AA, Accesibilidad, Hardware Acceleration
+ * Sin Emojis en Enlaces WhatsApp (Texto Plano UTF-8 Decodificable)
+ */
+
+document.addEventListener("DOMContentLoaded", () => {
+  initPendingNotices();
+  initHeader();
+  initActiveNavSpy();
+  initMobileDrawer();
+  initScrollReveal();
+  initVideoLazyLoad();
+  initHeroCounters();
+  initTimelineAnimation();
+  initGalleryLightbox();
+  initSpecializedQuoteWizard();
+  initQuickQuoteCards();
+  initServiceDirectLinks();
+  initCoberturaDropdown();
+});
+
+/* --- 0. Control de Marcadores Pendientes --- */
+function initPendingNotices() {
+  if (window.APP_CONFIG && window.APP_CONFIG.MOSTRAR_PENDIENTES === true) {
+    document.body.classList.add("show-pending");
+  } else {
+    document.body.classList.remove("show-pending");
+  }
+}
+
+/* --- 1. Header con reducción al hacer scroll --- */
+function initHeader() {
+  const header = document.querySelector(".site-header");
+  if (!header) return;
+
+  const onScroll = () => {
+    if (window.scrollY > 20) {
+      header.classList.add("scrolled");
+    } else {
+      header.classList.remove("scrolled");
+    }
+  };
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+}
+
+/* --- 2. Indicador de Sección Activa (Subrayado Deslizable - Bloque C) --- */
+function initActiveNavSpy() {
+  const navContainer = document.querySelector(".nav-links");
+  const navLinks = document.querySelectorAll(".nav-link");
+  const sections = document.querySelectorAll("section[id]");
+  if (!sections.length || !navLinks.length || !navContainer) return;
+
+  // Crear el indicador deslizante en el DOM si no existe
+  let indicator = navContainer.querySelector(".nav-sliding-indicator");
+  if (!indicator) {
+    indicator = document.createElement("span");
+    indicator.className = "nav-sliding-indicator";
+    indicator.setAttribute("aria-hidden", "true");
+    navContainer.appendChild(indicator);
+  }
+
+  const updateIndicator = (activeLink) => {
+    if (!activeLink) {
+      indicator.style.opacity = "0";
+      return;
+    }
+    const containerRect = navContainer.getBoundingClientRect();
+    const linkRect = activeLink.getBoundingClientRect();
+    const left = linkRect.left - containerRect.left;
+    const width = linkRect.width;
+    indicator.style.transform = "translateX(" + left + "px)";
+    indicator.style.width = `${width}px`;
+    indicator.style.opacity = "1";
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.getAttribute("id");
+        navLinks.forEach(link => {
+          const href = link.getAttribute("href") || "";
+          if (href === `#${id}` || href.endsWith(`#${id}`)) {
+            link.classList.add("active");
+            updateIndicator(link);
+          } else if (!href.includes("valle-del-cauca") && !href.includes("nacional")) {
+            link.classList.remove("active");
+          }
+        });
+      }
+    });
+  }, { rootMargin: "-20% 0px -60% 0px" });
+
+  sections.forEach(sec => observer.observe(sec));
+
+  navLinks.forEach(link => {
+    link.addEventListener("mouseenter", () => updateIndicator(link));
+  });
+
+  navContainer.addEventListener("mouseleave", () => {
+    const active = navContainer.querySelector(".nav-link.active");
+    updateIndicator(active);
+  });
+
+  window.addEventListener("resize", () => {
+    const active = navContainer.querySelector(".nav-link.active");
+    updateIndicator(active);
+  }, { passive: true });
+
+  // Inicializar indicador en la carga inicial
+  setTimeout(() => {
+    const initialActive = navContainer.querySelector(".nav-link.active") || navLinks[0];
+    updateIndicator(initialActive);
+  }, 100);
+}
+
+/* --- 3. Menú de las Tres Rayas (Panel Lateral Móvil) --- */
+function initMobileDrawer() {
+  const btn = document.querySelector(".hamburger-btn");
+  const drawer = document.querySelector(".mobile-nav-drawer");
+  const backdrop = document.getElementById("mobileDrawerBackdrop");
+  const closeBtn = document.getElementById("mobileDrawerCloseBtn");
+  if (!btn || !drawer) return;
+
+  const openDrawer = () => {
+    btn.setAttribute("aria-expanded", "true");
+    drawer.classList.add("is-open");
+    if (backdrop) backdrop.classList.add("is-active");
+    document.body.style.overflow = "hidden";
+    document.body.classList.add("menu-abierto");
+    document.querySelectorAll(".floating-actions-container, .floating-btn").forEach(b => b.style.display = "none");
+  };
+
+  const closeDrawer = () => {
+    btn.setAttribute("aria-expanded", "false");
+    drawer.classList.remove("is-open");
+    if (backdrop) backdrop.classList.remove("is-active");
+    document.body.style.overflow = "";
+    document.body.classList.remove("menu-abierto");
+    document.querySelectorAll(".floating-actions-container, .floating-btn").forEach(b => b.style.display = "");
+  };
+
+  btn.addEventListener("click", () => {
+    const isExpanded = btn.getAttribute("aria-expanded") === "true";
+    if (isExpanded) {
+      closeDrawer();
+    } else {
+      openDrawer();
+    }
+  });
+
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeDrawer);
+  }
+
+  if (backdrop) {
+    backdrop.addEventListener("click", closeDrawer);
+  }
+
+  drawer.querySelectorAll("a").forEach(link => {
+    link.addEventListener("click", () => {
+      closeDrawer();
+    });
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drawer.classList.contains("is-open")) {
+      closeDrawer();
+      btn.focus();
+    }
+  });
+}
+
+/* --- 3b. Control de Menú Móvil con bloqueo y ocultamiento de botones flotantes --- */
+// (Integrado en initMobileDrawer)
+
+/* --- 4. Revelado Escalonado al Scroll (IntersectionObserver - FASE 5) --- */
+function initScrollReveal() {
+  const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!prefersReduced) {
+    document.documentElement.classList.add("js-motion");
+    document.body.classList.add("js-motion");
+  }
+
+  // Marquesina: pausar cuando sale de pantalla para ahorrar GPU (animation-performance)
+  const marquee = document.querySelector(".marquee-strip");
+  if (marquee && "IntersectionObserver" in window) {
+    const marqueeObs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        marquee.classList.toggle("is-offscreen", !e.isIntersecting);
+      });
+    }, { threshold: 0.05 });
+    marqueeObs.observe(marquee);
+  }
+
+  if (prefersReduced || !("IntersectionObserver" in window)) {
+    document.querySelectorAll("[data-reveal], .reveal-on-scroll, .stagger-card").forEach(el => el.classList.add("is-revealed"));
+    return;
+  }
+
+  const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const target = entry.target;
+        const parent = target.parentElement;
+        const siblings = parent ? Array.from(parent.children).filter(c => c.hasAttribute("data-reveal")) : [];
+        const index = siblings.indexOf(target);
+        const delay = index > 0 ? Math.min(index * 60, 360) : 0; // 60ms entre tarjetas, máx 6
+
+        target.style.setProperty("--reveal-delay", `${delay}ms`);
+        target.classList.add("is-revealed");
+        obs.unobserve(target); // Una sola vez por elemento
+      }
+    });
+  }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" });
+
+  // Selección de elementos a revelar: secciones, encabezados, tarjetas, fotos, cifras y botones
+  const targets = document.querySelectorAll(
+    ".section-header, .service-info-card, .where-info-card, .bento-card-large, .bento-card-small, " +
+    ".timeline-step-card, .guarantee-item-card, .factor-card, .review-card, .faq-item, " +
+    ".gallery-photo-card, .quote-wizard-card, .quick-quote-card, .additional-services-strip, " +
+    ".hero-stats-grid > *"
+  );
+
+  targets.forEach((el, idx) => {
+    if (!el.hasAttribute("data-reveal")) {
+      // Variantes: izquierda/derecha para elementos alternos en bentos/guarantees, 'up' por defecto
+      if (el.classList.contains("bento-card-small") || el.classList.contains("factor-card")) {
+        el.setAttribute("data-reveal", idx % 2 === 0 ? "left" : "right");
+      } else {
+        el.setAttribute("data-reveal", "up");
+      }
+    }
+    observer.observe(el);
+  });
+}
+
+/* --- 5. Carga Diferida de Video con Poster --- */
+function initVideoLazyLoad() {
+  const video = document.getElementById("sanMiguelVideo");
+  if (!video) return;
+
+  const loadVideoSource = () => {
+    const source = video.querySelector("source");
+    if (source && source.dataset.src && !source.src) {
+      source.src = source.dataset.src;
+      video.load();
+    }
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        loadVideoSource();
+        observer.disconnect();
+      }
+    });
+  }, { rootMargin: "200px" });
+
+  observer.observe(video);
+  video.addEventListener("play", loadVideoSource, { once: true });
+}
+
+/* --- 6. Contador Animado para Cifras de Portada (FASE 5) --- */
+function initHeroCounters() {
+  const statsBar = document.querySelector(".hero-bottom-stats-bar") || document.querySelector(".hero-stats-grid");
+  if (!statsBar) return;
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
+
+  let animated = false;
+  const numElem = statsBar.querySelector(".stat-pill-item:first-child .stat-pill-num");
+  if (!numElem) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !animated) {
+        animated = true;
+        animateHeroStat(numElem, 6, "+", " AÑOS");
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.15 });
+
+  observer.observe(statsBar);
+}
+
+function animateHeroStat(element, target, prefix = "+", suffix = " AÑOS") {
+  if (!element) return;
+  const duration = 800; // Máximo 800ms
+  const startTime = performance.now();
+
+  function update(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    // Curva ease-out personalizada (1 - (1-p)^3)
+    const easeOut = 1 - Math.pow(1 - progress, 3);
+    const current = Math.max(1, Math.floor(easeOut * target));
+    element.textContent = `${prefix}${current}${suffix}`;
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    } else {
+      element.textContent = `${prefix}${target}${suffix}`;
+    }
+  }
+
+  requestAnimationFrame(update);
+}
+
+/* --- 7. Animación de Línea de Tiempo en "Cómo funciona" (Bloque F) --- */
+function initTimelineAnimation() {
+  const timeline = document.querySelector(".timeline-steps-grid");
+  if (!timeline) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        timeline.classList.add("is-active");
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.25 });
+
+  observer.observe(timeline);
+}
+
+/* --- 8. Lightbox Modal para Galería (Bloque E) --- */
+function initGalleryLightbox() {
+  const photoCards = document.querySelectorAll(".gallery-photo-card");
+  const modal = document.getElementById("imageLightboxModal");
+  const modalImg = document.getElementById("lightboxImage");
+  const closeBtn = document.getElementById("lightboxCloseBtn");
+
+  if (!photoCards.length || !modal || !modalImg) return;
+
+  photoCards.forEach(card => {
+    card.addEventListener("click", () => {
+      const img = card.querySelector("img");
+      if (img) {
+        modalImg.src = img.src;
+        modalImg.alt = img.alt || "Fotografía de Trasteos San Miguel";
+        modal.classList.add("is-open");
+        document.body.style.overflow = "hidden";
+      }
+    });
+  });
+
+  const closeModal = () => {
+    modal.classList.remove("is-open");
+    document.body.style.overflow = "";
+  };
+
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.classList.contains("is-open")) {
+      closeModal();
+    }
+  });
+}
+
+/* --- 9. Enlaces de Servicios que Preseleccionan y Desplazan Suavemente (Bloque A.7) --- */
+function initServiceDirectLinks() {
+  document.querySelectorAll('a[data-select-service]').forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const serviceVal = btn.getAttribute("data-select-service");
+      if (serviceVal) {
+        selectQueMoverRadio(serviceVal);
+      }
+    });
+  });
+
+  document.querySelectorAll('a[data-select-dest]').forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const destVal = btn.getAttribute("data-select-dest");
+      if (destVal) {
+        selectHaciaDondeRadio(destVal);
+      }
+    });
+  });
+}
+
+function selectQueMoverRadio(val) {
+  const radio = document.querySelector(`input[name="wizQueMover"][value="${val}"]`);
+  if (radio) {
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+function selectHaciaDondeRadio(val) {
+  const radio = document.querySelector(`input[name="wizHaciaDonde"][value="${val}"]`);
+  if (radio) {
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
+/* ==========================================================================
+   VALIDACIONES ESTRICTAS DE ENTRADA (WCAG & SEGURIDAD)
+   ========================================================================== */
+function validateName(name) {
+  const val = String(name || "").trim();
+  if (val.length < 6 && val.split(/\s+/).length < 2) return false;
+  if (val.toUpperCase() === "SA") return false;
+  if (/^([a-zA-ZáéíóúÁÉÍÓÚñÑ])\1+$/i.test(val)) return false;
+  const words = val.split(/\s+/).filter(w => w.length > 1);
+  return words.length >= 2 || val.length >= 6;
+}
+
+function validateColombiaPhone(phone) {
+  let clean = String(phone || "").trim().replace(/[\s\-\(\)\.]/g, "");
+  if (clean.startsWith("+57")) clean = clean.slice(3);
+  else if (clean.startsWith("57") && clean.length === 12) clean = clean.slice(2);
+  return /^3\d{9}$/.test(clean);
+}
+
+function validateAddress(addr) {
+  const str = String(addr || "").trim();
+  if (str.length < 5) return false;
+
+  // 1. Rechazar textos sin vocales
+  if (!/[aeiouáéíóúAEIOUÁÉÍÓÚ]/i.test(str)) return false;
+
+  // 2. Rechazar con una letra repetida más de tres veces (ej: eeee, www)
+  if (/([a-zA-Z])\1{3,}/i.test(str)) return false;
+
+  // 3. Rechazar textos basura conocidos o sin sentido (ej: sewewewed2, dewdsw565)
+  if (/^(sewewewed2|dewdsw565|asdfgh|qwerty|123456)/i.test(str)) return false;
+  if (/sewewewed2|dewdsw565/i.test(str)) return false;
+
+  // 4. Formato colombiano estándar o nombre de barrio y ciudad
+  const prefijosCol = /\b(calle|cl|cll|carrera|cra|kr|cr|avenida|av|diagonal|dg|transversal|tv|circular|manzana|mz|via|vía|km|kilometro|callejon|callejón|autopista)\b/i;
+  const tienePrefijo = prefijosCol.test(str);
+  const tieneNumero = /\d+/.test(str);
+
+  const palabras = str.split(/[\s,#\-\.\/]+/).filter(w => w.length >= 3 && /[aeiouáéíóú]/i.test(w));
+  const esBarrioCiudad = palabras.length >= 2;
+
+  return (tienePrefijo && tieneNumero) || esBarrioCiudad;
+}
+
+function validateCity(city) {
+  return String(city || "").trim().length >= 3;
+}
+
+function validateFutureDate(dateVal) {
+  if (!dateVal) return true;
+  const todayStr = new Date().toISOString().split("T")[0];
+  return dateVal >= todayStr;
+}
+
+function setFieldError(input, errorElement, isError) {
+  if (!input || !errorElement) return;
+  if (isError) {
+    input.classList.add("input-error");
+    input.setAttribute("aria-invalid", "true");
+    errorElement.style.display = "block";
+  } else {
+    input.classList.remove("input-error");
+    input.removeAttribute("aria-invalid");
+    errorElement.style.display = "none";
+  }
+}
+
+/* ==========================================================================
+   COTIZADORES ESPECIALIZADOS (LOCAL Y NACIONAL) - BLOQUE D
+   ========================================================================== */
+function initSpecializedQuoteWizard() {
+  const wizardContainer = document.getElementById("quoteWizard");
+  if (!wizardContainer) return;
+
+  const wizardType = wizardContainer.getAttribute("data-wizard-type") || 
+    (window.location.pathname.includes("nacional") ? "nacional" : "local");
+  const isNacional = wizardType === "nacional";
+
+  let currentStep = 1;
+  const totalSteps = 4;
+
+  const quoteData = {
+    tipoCotizador: isNacional ? "Nacional" : "Local",
+    nombre: "",
+    telefono: "",
+    queMover: "Hogar",
+    // Local
+    origenLocal: "",
+    origenLat: "",
+    origenLng: "",
+    tipoOrigenLocal: "Casa primer piso",
+    pisoOrigenLocal: 1,
+    ascensorOrigenLocal: "No aplica",
+    destinoLocal: "",
+    destinoLat: "",
+    destinoLng: "",
+    tipoDestinoLocal: "Casa primer piso",
+    pisoDestinoLocal: 1,
+    ascensorDestinoLocal: "No aplica",
+    // Nacional
+    deptoOrigenNac: "Valle del Cauca",
+    muniOrigenNac: "Cali",
+    barrioOrigenNac: "",
+    direccionOrigenNac: "",
+    tipoOrigenNac: "Casa",
+    pisoOrigenNac: 1,
+    ascensorOrigenNac: "No aplica",
+    accesoOrigenNac: "Sí, hasta la puerta",
+    deptoDestinoNac: "",
+    muniDestinoNac: "",
+    barrioDestinoNac: "",
+    direccionDestinoNac: "",
+    tipoDestinoNac: "Casa",
+    pisoDestinoNac: 1,
+    ascensorDestinoNac: "No aplica",
+    accesoDestinoNac: "Sí, hasta la puerta",
+    // Maquinaria específica
+    maquinaria: {
+      tipo: "",
+      cantidad: 1,
+      peso: "",
+      medidas: "",
+      requerimientos: [],
+      pisoAcceso: "",
+      camionEntra: ""
+    },
+    // Fecha y Ayuda
+    fecha: "",
+    horario: "Mañana (7:00 a.m. - 12:00 m.)",
+    ayudantes: "2 ayudantes + conductor",
+    extras: [],
+    // Objetos
+    inventario: {},
+    notas: "",
+    consent: false
+  };
+
+  // Referencias DOM
+  const panes = wizardContainer.querySelectorAll(".wizard-step-pane");
+  const nodes = wizardContainer.querySelectorAll(".wizard-step-node");
+  const progressFill = wizardContainer.querySelector(".wizard-progress-fill");
+  const btnPrev = document.getElementById("wizardBtnPrev");
+  const btnNext = document.getElementById("wizardBtnNext");
+  const btnSubmit = document.getElementById("wizardBtnSubmit");
+
+  const inputFecha = document.getElementById("wizFecha");
+  if (inputFecha) {
+    inputFecha.min = new Date().toISOString().split("T")[0];
+  }
+
+  // Preselección por parámetro URL ?servicio=hogar|empresa|pequena|maquinaria
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramServicio = urlParams.get("servicio");
+  if (paramServicio) {
+    let serviceValue = "Hogar";
+    if (paramServicio === "empresa") serviceValue = "Oficina o empresa";
+    else if (paramServicio === "pequena" || paramServicio === "expres") serviceValue = "Mudanza pequeña (hasta 4 objetos)";
+    else if (paramServicio === "maquinaria") serviceValue = "Maquinaria o equipos";
+    
+    quoteData.queMover = serviceValue;
+    const targetRadio = wizardContainer.querySelector(`input[name="wizQueMover"][value="${serviceValue}"]`);
+    if (targetRadio) {
+      targetRadio.checked = true;
+      wizardContainer.querySelectorAll(".que-mover-card").forEach(c => c.classList.remove("selected"));
+      targetRadio.closest(".que-mover-card")?.classList.add("selected");
+    }
+  }
+
+  // Inicialización de lógica condicional de ascensores (FASE 4.1)
+  function initElevatorControls() {
+    const placeSelects = wizardContainer.querySelectorAll(".place-type-select");
+    const floorSelects = wizardContainer.querySelectorAll(".floor-select");
+
+    function updateElevatorState(targetSuffix) {
+      const typeSelect = wizardContainer.querySelector(`.place-type-select[data-target="${targetSuffix}"]`);
+      const floorSelect = wizardContainer.querySelector(`.floor-select[data-target="${targetSuffix}"]`);
+      const elevatorGroup = document.getElementById(`grpAscensor${targetSuffix}`);
+      if (!typeSelect || !floorSelect || !elevatorGroup) return;
+
+      const typeVal = typeSelect.value;
+      const floorVal = floorSelect.value;
+
+      // Ascensor solo si es apartamento u oficina en piso 2 o más
+      const isEligibleType = typeVal === "Apartamento" || typeVal === "Oficina o local" || typeVal === "Oficina";
+      const isFloor2Plus = floorVal !== "1";
+
+      if (isEligibleType && isFloor2Plus) {
+        elevatorGroup.style.display = "block";
+      } else {
+        elevatorGroup.style.display = "none";
+        const elevatorSelect = document.getElementById(`wizAscensor${targetSuffix}`);
+        if (elevatorSelect) elevatorSelect.value = "No aplica";
+      }
+    }
+
+    placeSelects.forEach(sel => {
+      sel.addEventListener("change", () => updateElevatorState(sel.getAttribute("data-target")));
+    });
+
+    floorSelects.forEach(sel => {
+      sel.addEventListener("change", () => updateElevatorState(sel.getAttribute("data-target")));
+    });
+
+    ["OrigenLocal", "DestinoLocal", "OrigenNac", "DestinoNac"].forEach(suffix => {
+      updateElevatorState(suffix);
+    });
+  }
+
+  initElevatorControls();
+
+  // Selección dinámica de paneles de objetos en Paso 3 según el servicio
+  function syncItemsPaneWithService(service) {
+    const paneHogar = document.getElementById("paneItemsHogar");
+    const paneEmpresa = document.getElementById("paneItemsEmpresa");
+    const panePequena = document.getElementById("paneItemsPequena");
+    const paneMaquinaria = document.getElementById("paneItemsMaquinaria");
+    const customItemWrap = document.getElementById("customItemContainer");
+
+    if (paneHogar) paneHogar.style.display = "none";
+    if (paneEmpresa) paneEmpresa.style.display = "none";
+    if (panePequena) panePequena.style.display = "none";
+    if (paneMaquinaria) paneMaquinaria.style.display = "none";
+
+    if (service === "Hogar") {
+      if (paneHogar) paneHogar.style.display = "block";
+      if (customItemWrap) customItemWrap.style.display = "block";
+    } else if (service === "Oficina o empresa") {
+      if (paneEmpresa) paneEmpresa.style.display = "block";
+      if (customItemWrap) customItemWrap.style.display = "block";
+    } else if (service.includes("pequeña") || service.includes("exprés")) {
+      if (panePequena) panePequena.style.display = "block";
+      if (customItemWrap) customItemWrap.style.display = "none";
+      updatePequenaCounterLimit();
+    } else if (service.includes("Maquinaria")) {
+      if (paneMaquinaria) paneMaquinaria.style.display = "block";
+      if (customItemWrap) customItemWrap.style.display = "none";
+    }
+  }
+
+  // Radio cards: ¿Qué vas a mover?
+  const queMoverCards = wizardContainer.querySelectorAll('.que-mover-card');
+  queMoverCards.forEach(card => {
+    const radio = card.querySelector('input[type="radio"]');
+    card.addEventListener("click", () => {
+      queMoverCards.forEach(c => c.classList.remove("selected"));
+      card.classList.add("selected");
+      if (radio) {
+        radio.checked = true;
+        quoteData.queMover = radio.value;
+        syncItemsPaneWithService(radio.value);
+        syncPlaceTypesWithService(radio.value);
+      }
+    });
+    if (radio) {
+      radio.addEventListener("change", () => {
+        if (radio.checked) {
+          queMoverCards.forEach(c => c.classList.remove("selected"));
+          card.classList.add("selected");
+          quoteData.queMover = radio.value;
+          syncItemsPaneWithService(radio.value);
+        syncPlaceTypesWithService(radio.value);
+        }
+      });
+    }
+  });
+
+  // Inicializar pane de objetos según servicio actual
+  syncItemsPaneWithService(quoteData.queMover);
+  syncPlaceTypesWithService(quoteData.queMover);
+  // Refinamiento FASE 5: Defaults de tipo de lugar según el servicio
+  function syncPlaceTypesWithService(service) {
+    let defaultPlace = "Casa";
+    if (service === "Oficina o empresa") {
+      defaultPlace = "Oficina o local";
+    } else if (service.includes("Maquinaria")) {
+      defaultPlace = "Bodega";
+    } else {
+      defaultPlace = "Casa";
+    }
+
+    const placeSelects = wizardContainer.querySelectorAll(".place-type-select, #wizTipoOrigenLocal, #wizTipoDestinoLocal, #wizTipoOrigenNac, #wizTipoDestinoNac");
+    placeSelects.forEach(sel => {
+      // Buscar si tiene la opcion
+      let optionExists = Array.from(sel.options).some(opt => opt.value === defaultPlace);
+      if (optionExists) {
+        sel.value = defaultPlace;
+      } else if (defaultPlace === "Oficina o local") {
+        sel.value = "Oficina";
+      }
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  // Refinamiento FASE 5: Confirmación de dirección en blur y mensaje de error colombiano
+  function setupAddressBlurConfirmation() {
+    const addrInputs = wizardContainer.querySelectorAll("#wizOrigenLocal, #wizDestinoLocal, #wizDireccionOrigenNac, #wizDireccionDestinoNac");
+    addrInputs.forEach(input => {
+      // Mensaje de error personalizado exacto
+      const errEl = document.getElementById(input.getAttribute("aria-describedby") || ("err" + input.id.replace("wiz", "")));
+      if (errEl) {
+        errEl.textContent = "Escribe la dirección completa, por ejemplo: Calle 14 # 85-20, Valle del Lili";
+      }
+
+      input.addEventListener("blur", () => {
+        const val = input.value.trim();
+        let confirmBox = document.getElementById(`confirm-${input.id}`);
+        if (!confirmBox) {
+          confirmBox = document.createElement("div");
+          confirmBox.id = `confirm-${input.id}`;
+          confirmBox.className = "addr-confirm-box";
+          input.parentNode.appendChild(confirmBox);
+        }
+
+        if (validateAddress(val)) {
+          // Formatear dirección ordenada
+          const formatted = val.charAt(0).toUpperCase() + val.slice(1);
+          confirmBox.innerHTML = `✓ Dirección ordenada: <strong>${escapeHTML(formatted)}</strong> · ¿Es correcta?`;
+          confirmBox.style.display = "flex";
+          if (errEl) errEl.style.display = "none";
+        } else {
+          confirmBox.style.display = "none";
+          if (val.length > 0 && errEl) {
+            errEl.style.display = "block";
+            input.classList.add("input-error");
+          }
+        }
+        renderWizardSummary();
+      });
+
+      // Actualizar en vivo también en input
+      input.addEventListener("input", () => {
+        renderWizardSummary();
+      });
+    });
+  }
+
+  setupAddressBlurConfirmation();
+
+  // Refinamiento FASE 5: Actualización en vivo del resumen al cambiar fecha, horario, ayudantes y extras
+  ['wizFecha', 'wizHorario', 'wizAyudantes', 'wizExtraEmbalaje', 'wizExtraDesarme'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('change', () => {
+        if (id === 'wizFecha') quoteData.fecha = el.value;
+        if (id === 'wizHorario') quoteData.horario = el.value;
+        if (id === 'wizAyudantes') quoteData.ayudantes = el.value;
+        renderWizardSummary();
+      });
+      el.addEventListener('input', () => {
+        if (id === 'wizFecha') quoteData.fecha = el.value;
+        renderWizardSummary();
+      });
+    }
+  });
+
+  updateWizardView("forward");
+
+
+  // Tabs de categorías en Hogar
+  const catTabs = wizardContainer.querySelectorAll(".cat-tab-btn");
+  const groupPanes = wizardContainer.querySelectorAll(".items-group-pane");
+  catTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      catTabs.forEach(t => t.classList.remove("active"));
+      groupPanes.forEach(p => p.classList.remove("active"));
+      tab.classList.add("active");
+      const cat = tab.getAttribute("data-category");
+      const targetPane = document.getElementById(`pane-${cat}`);
+      if (targetPane) targetPane.classList.add("active");
+    });
+  });
+
+  // Contadores generales de objetos
+  wizardContainer.querySelectorAll(".btn-counter:not(.btn-counter-pequena)").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const action = btn.getAttribute("data-action");
+      const itemKey = btn.getAttribute("data-item-key");
+      const itemName = btn.getAttribute("data-item");
+      const countEl = document.getElementById(`count-${itemKey}`);
+      if (!countEl) return;
+
+      let current = parseInt(countEl.textContent, 10) || 0;
+      if (action === "plus") {
+        current = Math.min(current + 1, 99);
+      } else if (action === "minus") {
+        current = Math.max(current - 1, 0);
+      }
+      countEl.textContent = current;
+      quoteData.inventario[itemName] = current;
+      renderWizardSummary();
+    });
+  });
+
+  // Lógica Especial: Mudanza pequeña (Máx 4 objetos en total)
+  function updatePequenaCounterLimit() {
+    const pequenaRows = wizardContainer.querySelectorAll("#paneItemsPequena .item-counter-row");
+    let totalPequena = 0;
+    const pequenaItems = {};
+
+    pequenaRows.forEach(row => {
+      const valEl = row.querySelector(".counter-val");
+      const count = parseInt(valEl?.textContent, 10) || 0;
+      totalPequena += count;
+    });
+
+    const countValDisplay = document.getElementById("pequenaCountVal");
+    if (countValDisplay) countValDisplay.textContent = totalPequena;
+
+    const limitBadge = document.getElementById("pequenaLimitBadge");
+    const warningBanner = document.getElementById("pequenaWarningBanner");
+
+    const plusButtons = wizardContainer.querySelectorAll("#paneItemsPequena button[data-action='plus']");
+
+    if (totalPequena >= 4) {
+      if (limitBadge) limitBadge.classList.add("limit-reached");
+      if (warningBanner) warningBanner.classList.add("visible");
+      plusButtons.forEach(b => {
+        b.disabled = true;
+      });
+    } else {
+      if (limitBadge) limitBadge.classList.remove("limit-reached");
+      if (warningBanner) warningBanner.classList.remove("visible");
+      plusButtons.forEach(b => {
+        b.disabled = false;
+      });
+    }
+
+    return totalPequena;
+  }
+
+  wizardContainer.querySelectorAll(".btn-counter-pequena").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const action = btn.getAttribute("data-action");
+      const itemKey = btn.getAttribute("data-item-key");
+      const itemName = btn.getAttribute("data-item");
+      const countEl = document.getElementById(`count-${itemKey}`);
+      if (!countEl) return;
+
+      let current = parseInt(countEl.textContent, 10) || 0;
+      const currentTotal = updatePequenaCounterLimit();
+
+      if (action === "plus") {
+        if (currentTotal < 4) {
+          current += 1;
+        }
+      } else if (action === "minus") {
+        current = Math.max(current - 1, 0);
+      }
+      countEl.textContent = current;
+      quoteData.inventario[itemName] = current;
+      updatePequenaCounterLimit();
+      renderWizardSummary();
+    });
+  });
+
+  // Objeto personalizado para Hogar y Oficina
+  const btnAddCustom = document.getElementById("btnAddCustomItem");
+  const inputCustom = document.getElementById("customItemName");
+  const customList = document.getElementById("customItemsList");
+  if (btnAddCustom && inputCustom && customList) {
+    btnAddCustom.addEventListener("click", () => {
+      const name = inputCustom.value.trim();
+      if (!name) return;
+      const key = "custom_" + Date.now();
+      quoteData.inventario[name] = 1;
+
+      const itemRow = document.createElement("div");
+      itemRow.className = "item-counter-row";
+      itemRow.innerHTML = `
+        <span class="item-name">${escapeHTML(name)}</span>
+        <div class="counter-controls">
+          <button type="button" class="btn-counter" data-action="minus">−</button>
+          <span class="counter-val" id="count-${key}">1</span>
+          <button type="button" class="btn-counter" data-action="plus">+</button>
+        </div>
+      `;
+
+      itemRow.querySelector('[data-action="plus"]').addEventListener("click", () => {
+        let val = parseInt(document.getElementById(`count-${key}`).textContent, 10) || 1;
+        val = Math.min(val + 1, 99);
+        document.getElementById(`count-${key}`).textContent = val;
+        quoteData.inventario[name] = val;
+        renderWizardSummary();
+      });
+
+      itemRow.querySelector('[data-action="minus"]').addEventListener("click", () => {
+        let val = parseInt(document.getElementById(`count-${key}`).textContent, 10) || 1;
+        val = Math.max(val - 1, 0);
+        document.getElementById(`count-${key}`).textContent = val;
+        quoteData.inventario[name] = val;
+        if (val === 0) itemRow.remove();
+        renderWizardSummary();
+      });
+
+      customList.appendChild(itemRow);
+      inputCustom.value = "";
+      renderWizardSummary();
+    });
+  }
+
+  // Integración defensiva de Google Places API (Places API New)
+  initGooglePlacesAutocomplete(isNacional);
+
+  // Navegación Siguiente
+  btnNext.addEventListener("click", () => {
+    if (!validateCurrentStep(currentStep)) return;
+    if (currentStep < totalSteps) {
+      currentStep++;
+      updateWizardView("forward");
+    }
+  });
+
+  // Navegación Anterior
+  btnPrev.addEventListener("click", () => {
+    if (currentStep > 1) {
+      currentStep--;
+      updateWizardView("backward");
+    }
+  });
+
+  function validateCurrentStep(step) {
+    if (step === 1) {
+      const nombreInput = document.getElementById("wizNombre");
+      const telInput = document.getElementById("wizTelefono");
+      const errNombre = document.getElementById("errNombre");
+      const errTel = document.getElementById("errTelefono");
+
+      const isNameValid = validateName(nombreInput?.value);
+      const isTelValid = validateColombiaPhone(telInput?.value);
+
+      setFieldError(nombreInput, errNombre, !isNameValid);
+      setFieldError(telInput, errTel, !isTelValid);
+
+      if (!isNameValid) { nombreInput?.focus(); return false; }
+      if (!isTelValid) { telInput?.focus(); return false; }
+
+      quoteData.nombre = nombreInput.value.trim();
+      quoteData.telefono = telInput.value.trim();
+      return true;
+    }
+
+    if (step === 2) {
+      if (isNacional) {
+        const muniOrigen = document.getElementById("wizMuniOrigenNac");
+        const barrioOrigen = document.getElementById("wizBarrioOrigenNac");
+        const dirOrigen = document.getElementById("wizDireccionOrigenNac");
+        const deptoDestino = document.getElementById("wizDeptoDestinoNac");
+        const muniDestino = document.getElementById("wizMuniDestinoNac");
+        const barrioDestino = document.getElementById("wizBarrioDestinoNac");
+        const dirDestino = document.getElementById("wizDireccionDestinoNac");
+
+        const errMuniOri = document.getElementById("errMuniOrigenNac");
+        const errBarrioOri = document.getElementById("errBarrioOrigenNac");
+        const errDirOri = document.getElementById("errDireccionOrigenNac");
+        const errDeptoDes = document.getElementById("errDeptoDestinoNac");
+        const errMuniDes = document.getElementById("errMuniDestinoNac");
+        const errBarrioDes = document.getElementById("errBarrioDestinoNac");
+        const errDirDes = document.getElementById("errDireccionDestinoNac");
+
+        const validMuniOri = validateCity(muniOrigen?.value);
+        const validBarrioOri = (barrioOrigen?.value || "").trim().length >= 3;
+        const validDirOri = validateAddress(dirOrigen?.value);
+        const validDeptoDes = !!deptoDestino?.value;
+        const validMuniDes = validateCity(muniDestino?.value);
+        const validBarrioDes = (barrioDestino?.value || "").trim().length >= 3;
+        const validDirDes = validateAddress(dirDestino?.value);
+
+        setFieldError(muniOrigen, errMuniOri, !validMuniOri);
+        setFieldError(barrioOrigen, errBarrioOri, !validBarrioOri);
+        setFieldError(dirOrigen, errDirOri, !validDirOri);
+        setFieldError(deptoDestino, errDeptoDes, !validDeptoDes);
+        setFieldError(muniDestino, errMuniDes, !validMuniDes);
+        setFieldError(barrioDestino, errBarrioDes, !validBarrioDes);
+        setFieldError(dirDestino, errDirDes, !validDirDes);
+
+        if (!validMuniOri) { muniOrigen?.focus(); return false; }
+        if (!validBarrioOri) { barrioOrigen?.focus(); return false; }
+        if (!validDirOri) { dirOrigen?.focus(); return false; }
+        if (!validDeptoDes) { deptoDestino?.focus(); return false; }
+        if (!validMuniDes) { muniDestino?.focus(); return false; }
+        if (!validBarrioDes) { barrioDestino?.focus(); return false; }
+        if (!validDirDes) { dirDestino?.focus(); return false; }
+
+        quoteData.muniOrigenNac = muniOrigen.value.trim();
+        quoteData.barrioOrigenNac = barrioOrigen.value.trim();
+        quoteData.direccionOrigenNac = dirOrigen.value.trim();
+        quoteData.origenLat = document.getElementById("wizOrigenLat")?.value || "";
+        quoteData.origenLng = document.getElementById("wizOrigenLng")?.value || "";
+        quoteData.tipoOrigenNac = document.getElementById("wizTipoOrigenNac")?.value || "Casa";
+        quoteData.pisoOrigenNac = document.getElementById("wizPisoOrigenNac")?.value || 1;
+        quoteData.ascensorOrigenNac = document.getElementById("wizAscensorOrigenNac")?.value || "No aplica";
+        quoteData.accesoOrigenNac = document.getElementById("wizAccesoOrigenNac")?.value || "Sí, hasta la puerta";
+
+        quoteData.deptoDestinoNac = deptoDestino.value;
+        quoteData.muniDestinoNac = muniDestino.value.trim();
+        quoteData.barrioDestinoNac = barrioDestino.value.trim();
+        quoteData.direccionDestinoNac = dirDestino.value.trim();
+        quoteData.destinoLat = document.getElementById("wizDestinoLat")?.value || "";
+        quoteData.destinoLng = document.getElementById("wizDestinoLng")?.value || "";
+        quoteData.tipoDestinoNac = document.getElementById("wizTipoDestinoNac")?.value || "Casa";
+        quoteData.pisoDestinoNac = document.getElementById("wizPisoDestinoNac")?.value || 1;
+        quoteData.ascensorDestinoNac = document.getElementById("wizAscensorDestinoNac")?.value || "No aplica";
+        quoteData.accesoDestinoNac = document.getElementById("wizAccesoDestinoNac")?.value || "Sí, hasta la puerta";
+      } else {
+        const origenInput = document.getElementById("wizOrigenLocal");
+        const destinoInput = document.getElementById("wizDestinoLocal");
+        const errOrigen = document.getElementById("errOrigenLocal");
+        const errDestino = document.getElementById("errDestinoLocal");
+
+        const isOrigenValid = validateAddress(origenInput?.value);
+        const isDestinoValid = validateAddress(destinoInput?.value);
+
+        setFieldError(origenInput, errOrigen, !isOrigenValid);
+        setFieldError(destinoInput, errDestino, !isDestinoValid);
+
+        if (!isOrigenValid) { origenInput?.focus(); return false; }
+        if (!isDestinoValid) { destinoInput?.focus(); return false; }
+
+        quoteData.origenLocal = origenInput.value.trim();
+        quoteData.origenLat = document.getElementById("wizOrigenLat")?.value || "";
+        quoteData.origenLng = document.getElementById("wizOrigenLng")?.value || "";
+        quoteData.tipoOrigenLocal = document.getElementById("wizTipoOrigenLocal")?.value || "Casa";
+        quoteData.pisoOrigenLocal = document.getElementById("wizPisoOrigenLocal")?.value || "1";
+        quoteData.ascensorOrigenLocal = document.getElementById("wizAscensorOrigenLocal")?.value || "No aplica";
+        quoteData.accesoOrigenLocal = document.getElementById("wizCamionEntraOrigenLocal")?.value || "Sí";
+
+        quoteData.destinoLocal = destinoInput.value.trim();
+        quoteData.destinoLat = document.getElementById("wizDestinoLat")?.value || "";
+        quoteData.destinoLng = document.getElementById("wizDestinoLng")?.value || "";
+        quoteData.tipoDestinoLocal = document.getElementById("wizTipoDestinoLocal")?.value || "Casa";
+        quoteData.pisoDestinoLocal = document.getElementById("wizPisoDestinoLocal")?.value || "1";
+        quoteData.ascensorDestinoLocal = document.getElementById("wizAscensorDestinoLocal")?.value || "No aplica";
+        quoteData.accesoDestinoLocal = document.getElementById("wizCamionEntraDestinoLocal")?.value || "Sí";
+      }
+      return true;
+    }
+
+    if (step === 3) {
+      if (quoteData.queMover === "Maquinaria o equipos") {
+        quoteData.maquinaria.tipo = document.getElementById("wizMaqTipo")?.value || "Maquinaria comercial";
+        quoteData.maquinaria.cantidad = document.getElementById("wizMaqCantidad")?.value || 1;
+        quoteData.maquinaria.peso = document.getElementById("wizMaqPeso")?.value || "";
+        quoteData.maquinaria.medidas = document.getElementById("wizMaqMedidas")?.value || "";
+        quoteData.maquinaria.desarmable = document.getElementById("wizMaqDesarmable")?.value || "No, pieza completa";
+        quoteData.maquinaria.ruedas = document.getElementById("wizMaqRuedas")?.value || "No";
+        quoteData.maquinaria.escaleras = document.getElementById("wizMaqEscaleras")?.value || "No, paso amplio a nivel";
+        quoteData.maquinaria.pisoAcceso = document.getElementById("wizMaqPisoAcceso")?.value || "";
+      }
+      return true;
+    }
+
+    return true;
+  }
+
+  function updateWizardView(direction = "forward") {
+    panes.forEach(p => {
+      p.classList.remove("active", "slide-forward", "slide-backward");
+    });
+    const currentPane = document.getElementById(`stepPane${currentStep}`);
+    if (currentPane) {
+      currentPane.classList.add("active");
+      currentPane.classList.add(direction === "forward" ? "slide-forward" : "slide-backward");
+    }
+
+    // Barra de progreso exacta: 25%, 50%, 75%, 100% con transición suave
+    const progressPercentages = { 1: 25, 2: 50, 3: 75, 4: 100 };
+    const pct = progressPercentages[currentStep] || 25;
+    if (progressFill) {
+      progressFill.style.width = `${pct}%`;
+    }
+
+    // Actualización de nodos: actual en negrita/subrayado con aria-current="step", anteriores con ✓ y clicables, futuros en gris
+    nodes.forEach((node, idx) => {
+      const stepNum = idx + 1;
+      const numSpan = node.querySelector(".node-num") || node;
+      if (stepNum === currentStep) {
+        node.setAttribute("aria-current", "step");
+        node.classList.add("is-current", "active");
+        node.classList.remove("is-passed", "is-future");
+        node.style.cursor = "default";
+        node.onclick = null;
+        if (numSpan && numSpan !== node) numSpan.textContent = String(stepNum);
+      } else if (stepNum < currentStep) {
+        node.removeAttribute("aria-current");
+        node.classList.add("is-passed", "active");
+        node.classList.remove("is-current", "is-future");
+        node.style.cursor = "pointer";
+        node.onclick = () => {
+          if (stepNum < currentStep) {
+            currentStep = stepNum;
+            updateWizardView("backward");
+          }
+        };
+        if (numSpan && numSpan !== node) numSpan.textContent = "✓";
+      } else {
+        node.removeAttribute("aria-current");
+        node.classList.add("is-future");
+        node.classList.remove("is-current", "is-passed", "active");
+        node.style.cursor = "default";
+        node.onclick = null;
+        if (numSpan && numSpan !== node) numSpan.textContent = String(stepNum);
+      }
+    });
+
+    // Botones de acción: en paso 1 solo Siguiente, pasos 2 y 3 Anterior y Siguiente, paso 4 Anterior y Enviar por WhatsApp
+    btnPrev.hidden = (currentStep === 1);
+    btnNext.hidden = (currentStep === totalSteps);
+    btnSubmit.hidden = (currentStep !== totalSteps);
+    const actionsBar = wizardContainer.querySelector(".quote-actions");
+    if (actionsBar) actionsBar.dataset.step = String(currentStep);
+
+    renderWizardSummary();
+    if (currentStep === totalSteps) {
+      syncConsentState();
+    }
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    wizardContainer.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" });
+  }
+
+  function renderWizardSummary() {
+    const summaryBox = document.getElementById("quoteSummaryContent");
+    if (!summaryBox) return;
+
+    // 1. Solicitante
+    const solicitanteText = (quoteData.nombre || quoteData.telefono)
+      ? `${escapeHTML(quoteData.nombre || "Falta ingresar")} · ${escapeHTML(quoteData.telefono || "Falta ingresar")}`
+      : "Falta ingresar";
+
+    // 2. Servicio
+    const servicioText = escapeHTML(quoteData.queMover || "Hogar");
+
+    // 3. Recogida
+    let recogidaText = "";
+    if (isNacional) {
+      recogidaText = quoteData.muniOrigenNac
+        ? `${quoteData.muniOrigenNac}${quoteData.barrioOrigenNac ? `, ${quoteData.barrioOrigenNac}` : ""}${quoteData.direccionOrigenNac ? ` - ${quoteData.direccionOrigenNac}` : ""}`
+        : "Cali, Valle del Cauca";
+    } else {
+      recogidaText = quoteData.origenLocal || "Falta ingresar dirección";
+    }
+
+    // 4. Entrega
+    let entregaText = "";
+    if (isNacional) {
+      entregaText = quoteData.muniDestinoNac
+        ? `${quoteData.muniDestinoNac}${quoteData.deptoDestinoNac ? `, ${quoteData.deptoDestinoNac}` : ""}${quoteData.barrioDestinoNac ? ` - ${quoteData.barrioDestinoNac}` : ""}${quoteData.direccionDestinoNac ? ` (${quoteData.direccionDestinoNac})` : ""}`
+        : "Destino nacional por definir";
+    } else {
+      entregaText = quoteData.destinoLocal || "Falta ingresar dirección";
+    }
+
+    // 5 y 6. Accesos
+    function formatPlaceInfo(tipo, piso, ascensor, acceso) {
+      let desc = tipo || "Casa";
+      if (piso && String(piso) !== "1") desc += `, piso ${piso}`;
+      else desc += `, piso 1`;
+      if (ascensor && ascensor !== "No aplica") {
+        desc += `, ascensor: ${ascensor}`;
+      }
+      if (acceso && (acceso.toLowerCase() === "sí" || acceso.includes("puerta"))) {
+        desc += `, camión a la puerta`;
+      }
+      return desc;
+    }
+
+    const accesoRecogida = isNacional
+      ? formatPlaceInfo(quoteData.tipoOrigenNac, quoteData.pisoOrigenNac, quoteData.ascensorOrigenNac, quoteData.accesoOrigenNac)
+      : formatPlaceInfo(quoteData.tipoOrigenLocal, quoteData.pisoOrigenLocal, quoteData.ascensorOrigenLocal, quoteData.accesoOrigenLocal);
+
+    const accesoEntrega = isNacional
+      ? formatPlaceInfo(quoteData.tipoDestinoNac, quoteData.pisoDestinoNac, quoteData.ascensorDestinoNac, quoteData.accesoDestinoNac)
+      : formatPlaceInfo(quoteData.tipoDestinoLocal, quoteData.pisoDestinoLocal, quoteData.ascensorDestinoLocal, quoteData.accesoDestinoLocal);
+
+    // 7. Objetos
+    let itemsText = "";
+    if (quoteData.queMover === "Maquinaria o equipos") {
+      const m = quoteData.maquinaria;
+      itemsText = `${m.tipo || "Maquinaria"} (${m.cantidad} unid)${m.peso ? ` · ${m.peso} kg` : ""}${m.medidas ? ` · ${m.medidas}` : ""}`;
+    } else {
+      const activeItems = Object.entries(quoteData.inventario || {})
+        .filter(([_, count]) => count > 0)
+        .map(([name, count]) => `${name} (${count})`)
+        .join(", ");
+      itemsText = activeItems || "Los enviaremos por WhatsApp";
+    }
+
+    // 8. Fecha
+    const fechaInputVal = document.getElementById("wizFecha")?.value || quoteData.fecha;
+    const fechaHTML = fechaInputVal
+      ? `<span style="color: var(--tinta); font-weight: 700;">${escapeHTML(fechaInputVal)}</span>`
+      : `<span style="color: #E53E3E; font-weight: 700;">Falta elegir</span>`;
+
+    // 9. Horario
+    const horarioText = document.getElementById("wizHorario")?.value || quoteData.horario || "Mañana (7:00 a.m. - 12:00 m.)";
+
+    // 10. Ayudantes
+    const ayudantesText = document.getElementById("wizAyudantes")?.value || quoteData.ayudantes || "2 ayudantes + conductor";
+
+    // 11. Servicios adicionales
+    const extrasList = [];
+    if (document.getElementById("wizExtraEmbalaje")?.checked) extrasList.push("Protección con papel vitafilm");
+    if (document.getElementById("wizExtraDesarme")?.checked) extrasList.push("Desarme y armado de muebles");
+    const extrasText = extrasList.length > 0 ? extrasList.join(", ") : "Ninguno";
+
+    summaryBox.innerHTML = `
+      <div class="summary-list">
+        <div class="summary-row">
+          <span class="summary-label">Solicitante:</span>
+          <span class="summary-value">${solicitanteText}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Servicio:</span>
+          <span class="summary-value">${servicioText}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Recogida:</span>
+          <span class="summary-value">${escapeHTML(recogidaText)}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Entrega:</span>
+          <span class="summary-value">${escapeHTML(entregaText)}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Acceso en recogida:</span>
+          <span class="summary-value">${escapeHTML(accesoRecogida)}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Acceso en entrega:</span>
+          <span class="summary-value">${escapeHTML(accesoEntrega)}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Objetos:</span>
+          <span class="summary-value">${escapeHTML(itemsText)}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Fecha:</span>
+          <span class="summary-value">${fechaHTML}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Horario:</span>
+          <span class="summary-value">${escapeHTML(horarioText)}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Ayudantes:</span>
+          <span class="summary-value">${escapeHTML(ayudantesText)}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Servicios adicionales:</span>
+          <span class="summary-value">${escapeHTML(extrasText)}</span>
+        </div>
+      </div>
+      <div class="summary-actions-row">
+        <button type="button" class="btn btn--sm btn--secondary" id="btnEditQuoteData" style="height: 38px; min-height: 38px; padding: 0 1rem; border-radius: 8px;">
+          <span>Modificar datos</span>
+        </button>
+      </div>
+    `;
+
+    document.getElementById("btnEditQuoteData")?.addEventListener("click", () => {
+      currentStep = 1;
+      updateWizardView("backward");
+    });
+  }
+
+  // Consentimiento: el único botón de envío se habilita solo al marcarlo
+  const consentBox = document.getElementById("wizConsent");
+  const consentHint = document.getElementById("quoteConsentHint");
+  function syncConsentState() {
+    const ok = !!consentBox?.checked;
+    btnSubmit.disabled = !ok;
+    btnSubmit.setAttribute("aria-disabled", String(!ok));
+    if (consentHint) {
+      consentHint.textContent = ok
+        ? "Listo: se abrirá WhatsApp con tu solicitud."
+        : "Marca la casilla de tratamiento de datos para habilitar el envío.";
+      consentHint.classList.toggle("is-ok", ok);
+    }
+  }
+  consentBox?.addEventListener("change", syncConsentState);
+  syncConsentState();
+
+  // Envío: Abre WhatsApp + Guarda en Google Sheets
+  btnSubmit.addEventListener("click", () => {
+    if (btnSubmit.classList.contains("is-loading")) return;
+    // Validar paso 4
+    const fechaInput = document.getElementById("wizFecha");
+    const errFecha = document.getElementById("errFecha");
+    const isFechaValid = validateFutureDate(fechaInput?.value);
+    setFieldError(fechaInput, errFecha, !isFechaValid);
+    if (!isFechaValid) { fechaInput?.focus(); return; }
+
+    const consent = document.getElementById("wizConsent");
+    const errConsent = document.getElementById("errConsent");
+    const hp = document.getElementById("website_hp");
+
+    if (!consent || !consent.checked) {
+      if (errConsent) errConsent.style.display = "block";
+      consent?.focus();
+      return;
+    } else {
+      if (errConsent) errConsent.style.display = "none";
+    }
+
+    if (hp && hp.value.trim() !== "") {
+      showFeedback("Solicitud procesada correctamente.", "success");
+      return;
+    }
+
+    quoteData.fecha = fechaInput?.value || "Por convenir";
+    quoteData.horario = document.getElementById("wizHorario")?.value || "Mañana";
+    quoteData.ayudantes = document.getElementById("wizAyudantes")?.value || "2 ayudantes + conductor";
+    
+    quoteData.extras = [];
+    if (document.getElementById("wizExtraEmbalaje")?.checked) quoteData.extras.push("Protección con papel vitafilm");
+    if (document.getElementById("wizExtraDesarme")?.checked) quoteData.extras.push("Desarme y armado de muebles");
+
+    quoteData.notas = document.getElementById("wizNotas")?.value.trim() || "";
+    quoteData.consent = true;
+
+    btnSubmit.classList.add("is-loading");
+    btnSubmit.setAttribute("aria-busy", "true");
+    if (consentHint) consentHint.textContent = "Abriendo WhatsApp…";
+
+    // 1. Mensaje en texto plano UTF-8 exacto según Bloque G
+    const messageText = generateBloqueGWhatsAppText(quoteData, isNacional);
+    const waPhone = window.APP_CONFIG?.PHONE_RAW || "573217676571";
+    const waUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(messageText)}`;
+
+    // 2. Envío Asíncrono a Google Sheets Apps Script
+    postToAppsScript(quoteData);
+
+    // 3. Apertura de WhatsApp y Pantalla de Confirmación
+    setTimeout(() => {
+      btnSubmit.classList.remove("is-loading");
+      window.open(waUrl, "_blank", "noopener,noreferrer");
+      displayConfirmationScreen(quoteData);
+    }, 250);
+  });
+
+  function postToAppsScript(data) {
+    const appsScriptUrl = window.APP_CONFIG?.APPS_SCRIPT_WEBAPP_URL || window.APP_CONFIG?.APPS_SCRIPT_URL;
+    if (!appsScriptUrl || appsScriptUrl.includes("[PENDIENTE") || appsScriptUrl === "") {
+      return Promise.resolve({ status: "skipped_no_url" });
+    }
+
+    return fetch(appsScriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      mode: "no-cors"
+    }).catch(err => {
+      console.warn("Apps Script dispatch note:", err);
+    });
+  }
+
+  function displayConfirmationScreen(data) {
+    const wizardBody = wizardContainer.querySelector(".wizard-body");
+    const wizardFooter = wizardContainer.querySelector(".wizard-footer");
+    if (!wizardBody) return;
+
+    if (wizardFooter) wizardFooter.style.display = "none";
+    wizardBody.innerHTML = `
+      <div class="confirmation-screen">
+        <div class="confirmation-check">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3 style="font-size: 1.4rem; color: var(--blue-footer); margin-bottom: 0.5rem;">¡Solicitud enviada con éxito!</h3>
+        <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 500px; margin: 0 auto 1.5rem auto;">
+          Se ha abierto la conversación oficial de WhatsApp con tu cotización detallada. Nuestro equipo te responderá pronto con la tarifa exacta y disponibilidad.
+        </p>
+        <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+          <a href="${isNacional ? 'nacional.html' : 'valle-del-cauca.html'}" class="btn btn--secondary btn--sm">
+            <span>Nueva cotización</span>
+          </a>
+          <a href="index.html" class="btn btn--primary btn--sm">
+            <span>Volver al inicio</span>
+          </a>
+        </div>
+      </div>
+    `;
+  }
+
+  function showFeedback(msg, type) {
+    const box = document.getElementById("submissionFeedback");
+    if (!box) return;
+    box.textContent = msg;
+    box.className = `submission-feedback ${type}`;
+    box.style.display = "block";
+  }
+
+  // Hook global de prueba para DevTools
+  window.testQuoteData = quoteData;
+}
+
+/* ==========================================================================
+   INTEGRACIÓN DEFENSIVA GOOGLE PLACES API (PLACES API NEW)
+   ========================================================================== */
+function initGooglePlacesAutocomplete(isNacional) {
+  const apiKey = window.APP_CONFIG?.GOOGLE_MAPS_API_KEY;
+
+  if (!apiKey || apiKey.trim() === "" || apiKey.includes("[PENDIENTE")) {
+    console.info("Google Places API Key no configurada; operando en modo texto libre con validación local.");
+    return;
+  }
+
+  if (typeof google === "object" && typeof google.maps === "object" && google.maps.places) {
+    setupAutocompleteFields(isNacional);
+    return;
+  }
+
+  // Carga asíncrona del script de Google Maps Places API New
+  const existingScript = document.getElementById("googleMapsPlacesScript");
+  if (!existingScript) {
+    const script = document.createElement("script");
+    script.id = "googleMapsPlacesScript";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&loading=async`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      setupAutocompleteFields(isNacional);
+    };
+    script.onerror = () => {
+      console.warn("No se pudo cargar Google Places API. Operando en modo texto estándar.");
+    };
+    document.head.appendChild(script);
+  }
+}
+
+function setupAutocompleteFields(isNacional) {
+  if (typeof google === "undefined" || !google.maps || !google.maps.places) return;
+
+  const options = {
+    componentRestrictions: { country: "co" },
+    fields: ["formatted_address", "geometry", "name"]
+  };
+
+  if (!isNacional) {
+    // Sesgo hacia Cali y Valle del Cauca
+    options.bounds = new google.maps.LatLngBounds(
+      new google.maps.LatLng(3.0, -77.2),
+      new google.maps.LatLng(4.3, -75.8)
+    );
+    options.strictBounds = false;
+  }
+
+  const inputs = document.querySelectorAll(".places-autocomplete-input");
+  inputs.forEach(input => {
+    try {
+      const autocomplete = new google.maps.places.Autocomplete(input, options);
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (!place || !place.geometry) return;
+
+        input.value = place.formatted_address || place.name || input.value;
+
+        // Guardar coordenadas en campos ocultos correspondientes
+        if (input.id.includes("Origen")) {
+          const latField = document.getElementById("wizOrigenLat");
+          const lngField = document.getElementById("wizOrigenLng");
+          const fmtField = document.getElementById("wizOrigenFormatted");
+          if (latField) latField.value = place.geometry.location.lat();
+          if (lngField) lngField.value = place.geometry.location.lng();
+          if (fmtField) fmtField.value = place.formatted_address || input.value;
+        } else if (input.id.includes("Destino")) {
+          const latField = document.getElementById("wizDestinoLat");
+          const lngField = document.getElementById("wizDestinoLng");
+          const fmtField = document.getElementById("wizDestinoFormatted");
+          if (latField) latField.value = place.geometry.location.lat();
+          if (lngField) lngField.value = place.geometry.location.lng();
+          if (fmtField) fmtField.value = place.formatted_address || input.value;
+        }
+      });
+    } catch (e) {
+      console.warn("Error al inicializar Autocomplete en campo:", input.id, e);
+    }
+  });
+}
+
+/* ==========================================================================
+   GENERADOR DE MENSAJE WHATSAPP SEGÚN FORMATO EXACTO BLOQUE G
+   ========================================================================== */
+function formatSpanishDate(dateStr, horario) {
+  if (!dateStr) return "Por convenir";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const date = new Date(year, month, day);
+      const days = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+      const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+      
+      const dayName = days[date.getDay()];
+      const monthName = months[month];
+      
+      let jornadaText = "en la mañana";
+      if (horario && horario.toLowerCase().includes("tarde")) {
+        jornadaText = "en la tarde";
+      } else if (horario && horario.toLowerCase().includes("indiferente")) {
+        jornadaText = "en jornada a convenir";
+      }
+      return `${dayName} ${day} de ${monthName} de ${year}, ${jornadaText}`;
+    }
+  } catch (e) {}
+  return dateStr;
+}
+
+function generateBloqueGWhatsAppText(data, isNacional) {
+  const lineas = [];
+
+  const saludo = isNacional 
+    ? "Hola, quiero cotizar una mudanza nacional con San Miguel." 
+    : "Hola, quiero cotizar una mudanza local en Cali y Valle con San Miguel.";
+  lineas.push(saludo);
+  lineas.push(`*Nombre:* ${data.nombre}`);
+  lineas.push(`*Celular:* ${data.telefono}`);
+  lineas.push(`*Qué voy a mover:* ${data.queMover}`);
+
+  // Recogida
+  let recogidaStr = "";
+  if (isNacional) {
+    recogidaStr = `${data.direccionOrigenNac}, barrio ${data.barrioOrigenNac}, ${data.muniOrigenNac} (${data.deptoOrigenNac}), ${data.tipoOrigenNac}, piso ${data.pisoOrigenNac}`;
+    if (data.ascensorOrigenNac && data.ascensorOrigenNac !== "No aplica") {
+      recogidaStr += ` (${data.ascensorOrigenNac})`;
+    }
+    if (data.origenLat && data.origenLng) {
+      recogidaStr += ` · Mapa: https://www.google.com/maps/search/?api=1&query=${data.origenLat},${data.origenLng}`;
+    }
+  } else {
+    recogidaStr = `${data.origenLocal}, Cali / Valle del Cauca, ${data.tipoOrigenLocal}, piso ${data.pisoOrigenLocal}`;
+    if (data.ascensorOrigenLocal && data.ascensorOrigenLocal !== "No aplica") {
+      recogidaStr += ` (${data.ascensorOrigenLocal})`;
+    }
+    if (data.origenLat && data.origenLng) {
+      recogidaStr += ` · Mapa: https://www.google.com/maps/search/?api=1&query=${data.origenLat},${data.origenLng}`;
+    }
+  }
+  lineas.push(`*Recogida:* ${recogidaStr}`);
+
+  // Entrega
+  let entregaStr = "";
+  if (isNacional) {
+    entregaStr = `${data.direccionDestinoNac}, barrio ${data.barrioDestinoNac}, ${data.muniDestinoNac} (${data.deptoDestinoNac}), ${data.tipoDestinoNac}, piso ${data.pisoDestinoNac}`;
+    if (data.ascensorDestinoNac && data.ascensorDestinoNac !== "No aplica") {
+      entregaStr += ` (${data.ascensorDestinoNac})`;
+    }
+    if (data.destinoLat && data.destinoLng) {
+      entregaStr += ` · Mapa: https://www.google.com/maps/search/?api=1&query=${data.destinoLat},${data.destinoLng}`;
+    }
+  } else {
+    entregaStr = `${data.destinoLocal}, Cali / Valle del Cauca, ${data.tipoDestinoLocal}, piso ${data.pisoDestinoLocal}`;
+    if (data.ascensorDestinoLocal && data.ascensorDestinoLocal !== "No aplica") {
+      entregaStr += ` (${data.ascensorDestinoLocal})`;
+    }
+    if (data.destinoLat && data.destinoLng) {
+      entregaStr += ` · Mapa: https://www.google.com/maps/search/?api=1&query=${data.destinoLat},${data.destinoLng}`;
+    }
+  }
+  lineas.push(`*Entrega:* ${entregaStr}`);
+
+  // Fecha
+  const fechaFormateada = formatSpanishDate(data.fecha, data.horario);
+  lineas.push(`*Fecha:* ${fechaFormateada}`);
+
+  // Ayudantes
+  lineas.push(`*Ayudantes:* ${data.ayudantes}`);
+
+  // Servicios adicionales
+  const serviciosExtraStr = data.extras && data.extras.length > 0 
+    ? data.extras.join(", ") 
+    : "Ninguno adicional";
+  lineas.push(`*Servicios adicionales:* ${serviciosExtraStr}`);
+
+  // Objetos
+  let objetosStr = "";
+  if (data.queMover === "Maquinaria o equipos") {
+    const m = data.maquinaria;
+    objetosStr = `${m.tipo} (${m.cantidad} unid)${m.peso ? ` · Peso aprox: ${m.peso} kg` : ""}${m.medidas ? ` · Medidas: ${m.medidas}` : ""}${m.desarmable ? ` · Desarme: ${m.desarmable}` : ""}${m.ruedas === "Sí" ? " · Con ruedas" : ""}${m.escaleras ? ` · Escaleras/puertas: ${m.escaleras}` : ""}${m.pisoAcceso ? ` · Acceso: ${m.pisoAcceso}` : ""}`;
+  } else {
+    const items = Object.entries(data.inventario || {})
+      .filter(([_, count]) => count > 0)
+      .map(([item, count]) => `${item} (${count})`);
+    
+    if (items.length > 0) {
+      objetosStr = items.join(", ");
+    } else {
+      objetosStr = "Aún no tengo la lista, la envío por este chat.";
+    }
+  }
+  lineas.push(`*Objetos:* ${objetosStr}`);
+
+  // Notas
+  lineas.push(`*Notas:* ${data.notas || "Sin observaciones adicionales."}`);
+
+  // Cierre estricto Bloque G
+  lineas.push("¿Me pueden indicar el valor y la disponibilidad?");
+
+  return lineas.join("\n");
+}
+
+// Utilidad para pruebas de decodificación en DevTools (Bloque H)
+window.testWhatsAppFormat = function(scenario = "local_hogar") {
+  if (scenario === "local_hogar") {
+    const sample = {
+      nombre: "Carlos Mendoza",
+      telefono: "3217676571",
+      queMover: "Hogar",
+      origenLocal: "Calle 14 # 85-20, Valle del Lili",
+      tipoOrigenLocal: "Apartamento con ascensor",
+      pisoOrigenLocal: 3,
+      ascensorOrigenLocal: "Sí cuenta con ascensor",
+      origenLat: "3.3762",
+      origenLng: "-76.5358",
+      destinoLocal: "Carrera 12 # 5-40, Cali",
+      tipoDestinoLocal: "Casa dos pisos",
+      pisoDestinoLocal: 1,
+      ascensorDestinoLocal: "No aplica",
+      destinoLat: "3.2612",
+      destinoLng: "-76.5410",
+      fecha: "2026-10-26",
+      horario: "Mañana (7:00 a.m. - 12:00 m.)",
+      ayudantes: "2 ayudantes + conductor",
+      extras: ["Protección con papel vitafilm"],
+      inventario: { "Sofá 3 puestos": 1, "Nevera": 1, "Cama Doble / Semidoble": 1 },
+      notas: "Cuidado especial con el refrigerador."
+    };
+    const text = generateBloqueGWhatsAppText(sample, false);
+    return {
+      decoded: text,
+      url: `https://wa.me/573217676571?text=${encodeURIComponent(text)}`
+    };
+  } else if (scenario === "local_maquinaria") {
+    const sample = {
+      nombre: "Distribuciones del Valle",
+      telefono: "3158901234",
+      queMover: "Maquinaria o equipos",
+      origenLocal: "Calle 25 # 4-50, San Nicolás, Cali",
+      tipoOrigenLocal: "Local u oficina",
+      pisoOrigenLocal: 1,
+      ascensorOrigenLocal: "No aplica",
+      origenLat: "3.4485",
+      origenLng: "-76.5298",
+      destinoLocal: "Carrera 35 # 10-20, Cali",
+      tipoDestinoLocal: "Bodega",
+      pisoDestinoLocal: 1,
+      ascensorDestinoLocal: "No aplica",
+      destinoLat: "3.5280",
+      destinoLng: "-76.5050",
+      fecha: "2026-10-28",
+      horario: "Mañana (7:00 a.m. - 12:00 m.)",
+      ayudantes: "3 o más ayudantes + conductor",
+      extras: [],
+      maquinaria: {
+        tipo: "Equipos de panadería o cocina industrial",
+        cantidad: 2,
+        peso: "380",
+        medidas: "1.90m × 1.10m × 1.30m",
+        requerimientos: ["Rampa hidráulica", "Cargue manual"],
+        pisoAcceso: "Nivel de andén sin desniveles",
+        camionEntra: "Sí, entrada directa"
+      },
+      notas: "Equipos pesados de acero inoxidable."
+    };
+    const text = generateBloqueGWhatsAppText(sample, false);
+    return {
+      decoded: text,
+      url: `https://wa.me/573217676571?text=${encodeURIComponent(text)}`
+    };
+  } else if (scenario === "nacional_oficina") {
+    const sample = {
+      nombre: "Consultores Asociados Cali",
+      telefono: "3104567890",
+      queMover: "Oficina o empresa",
+      deptoOrigenNac: "Valle del Cauca",
+      muniOrigenNac: "Cali",
+      barrioOrigenNac: "Granada",
+      direccionOrigenNac: "Avenida 9N # 12-40",
+      tipoOrigenNac: "Oficina",
+      pisoOrigenNac: 4,
+      ascensorOrigenNac: "Sí cuenta con ascensor",
+      origenLat: "3.4560",
+      origenLng: "-76.5360",
+      deptoDestinoNac: "Cundinamarca",
+      muniDestinoNac: "Bogotá D.C.",
+      barrioDestinoNac: "Chicó Norte",
+      direccionDestinoNac: "Carrera 15 # 93-60",
+      tipoDestinoNac: "Edificio empresarial",
+      pisoDestinoNac: 5,
+      ascensorDestinoNac: "Sí cuenta con ascensor",
+      destinoLat: "4.6780",
+      destinoLng: "-74.0530",
+      fecha: "2026-11-02",
+      horario: "Mañana (7:00 a.m. - 12:00 m.)",
+      ayudantes: "2 ayudantes + conductor",
+      extras: ["Protección con papel vitafilm", "Desarme y armado de muebles"],
+      inventario: { "Escritorios": 4, "Sillas oficina": 4, "Computadores y pantallas": 4, "Archivadores": 2 },
+      notas: "Coordinar ingreso con administración del edificio."
+    };
+    const text = generateBloqueGWhatsAppText(sample, true);
+    return {
+      decoded: text,
+      url: `https://wa.me/573217676571?text=${encodeURIComponent(text)}`
+    };
+  }
+};
+
+function escapeHTML(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/* ==========================================================================
+   INTERACCIÓN TARJETAS DE COTIZACIÓN RÁPIDA (FASE 3.3)
+   ========================================================================== */
+function initQuickQuoteCards() {
+  // 1. Home Quick Quote
+  const quickOptionBtns = document.querySelectorAll(".quick-option-btn");
+  const quickQuoteAction = document.getElementById("btnQuickQuoteAction");
+  let selectedService = "hogar";
+
+  quickOptionBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      quickOptionBtns.forEach(b => b.classList.remove("active", "selected"));
+      btn.classList.add("active", "selected");
+      selectedService = btn.getAttribute("data-service") || "hogar";
+      if (quickQuoteAction) {
+        quickQuoteAction.href = `#donde-es?servicio=${selectedService}`;
+      }
+    });
+  });
+
+  // 2. Valle Quick Quote
+  const btnQuickValle = document.getElementById("btnQuickValleAction");
+  if (btnQuickValle) {
+    btnQuickValle.addEventListener("click", () => {
+      const orig = document.getElementById("wizQuickOrigenValle")?.value.trim();
+      const dest = document.getElementById("wizQuickDestinoValle")?.value.trim();
+      const wizOrig = document.getElementById("wizOrigenLocal");
+      const wizDest = document.getElementById("wizDestinoLocal");
+      if (orig && wizOrig) wizOrig.value = orig;
+      if (dest && wizDest) wizDest.value = dest;
+      const cotizador = document.getElementById("cotizador");
+      if (cotizador) cotizador.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  // 3. Nacional Quick Quote
+  const btnQuickNac = document.getElementById("btnQuickNacAction");
+  if (btnQuickNac) {
+    btnQuickNac.addEventListener("click", () => {
+      const destCity = document.getElementById("wizQuickDestinoNac")?.value.trim();
+      const srvMover = document.getElementById("wizQuickMoverNac")?.value;
+      const wizDestMuni = document.getElementById("wizMuniDestinoNac");
+      if (destCity && wizDestMuni) wizDestMuni.value = destCity;
+      if (srvMover) {
+        const targetRadio = document.querySelector(`input[name="wizQueMover"][value="${srvMover}"]`);
+        if (targetRadio) {
+          targetRadio.checked = true;
+          document.querySelectorAll(".que-mover-card").forEach(c => c.classList.remove("selected"));
+          targetRadio.closest(".que-mover-card")?.classList.add("selected");
+        }
+      }
+      const cotizador = document.getElementById("cotizador");
+      if (cotizador) cotizador.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+}
+
+
+/* --- 12. Menú Desplegable Cobertura con Accesibilidad Completa (FASE 6.1) --- */
+function initCoberturaDropdown() {
+  const btn = document.getElementById('coberturaDropdownBtn');
+  if (!btn) return;
+  const menu = btn.parentElement.querySelector('.dropdown-menu');
+  if (!menu) return;
+
+  const toggleDropdown = (open) => {
+    const shouldOpen = typeof open === 'boolean' ? open : !menu.classList.contains('is-open');
+    if (shouldOpen) {
+      menu.classList.add('is-open');
+      btn.setAttribute('aria-expanded', 'true');
+    } else {
+      menu.classList.remove('is-open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  };
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleDropdown();
+  });
+
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleDropdown(true);
+      const firstLink = menu.querySelector('a');
+      if (firstLink) firstLink.focus();
+    }
+  });
+
+  menu.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      toggleDropdown(false);
+      btn.focus();
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!btn.contains(e.target) && !menu.contains(e.target)) {
+      toggleDropdown(false);
+    }
+  });
+}
+
+/* --- 13. Inclinación 3D en Tarjetas con Puntero Fino (FASE 2.2) --- */
+function initCardTilt() {
+  const isFinePointer = window.matchMedia('(pointer: fine)').matches;
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!isFinePointer || prefersReducedMotion) return;
+
+  const tiltCards = document.querySelectorAll('.where-info-card, .service-info-card, .tilt-card');
+  tiltCards.forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateX = -((y - centerY) / centerY) * 4; // máx 4-5 grados
+      const rotateY = ((x - centerX) / centerX) * 4;
+
+      card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-4px)`;
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0)';
+    });
+  });
+}
+
+/* --- 14. Parallax en Capas de Portada (FASE 2.2 & 4.1) --- */
+function initHeroParallax() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const heroFrame = document.querySelector('.hero-glass-photo-frame');
+  const chipTop = document.querySelector('.hero-glass-chip--top');
+  const chipBottom = document.querySelector('.hero-glass-chip--bottom');
+  if (!heroFrame && !chipTop && !chipBottom) return;
+
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        const scrolled = window.scrollY;
+        if (scrolled < 800) {
+          if (heroFrame) heroFrame.style.transform = "translateY(" + (scrolled * 0.06) + "px)";
+          if (chipTop) chipTop.style.transform = "translateY(" + (scrolled * -0.04) + "px)";
+          if (chipBottom) chipBottom.style.transform = "translateY(" + (scrolled * -0.08) + "px)";
+        }
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+}
+
+/* --- 15. Enlaces Directos y Scroll Suave a Cotizador --- */
+function initServiceDirectLinks() {
+  const anchors = document.querySelectorAll('a[href^="#"]');
+  anchors.forEach(a => {
+    a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      if (href && href.length > 1 && href !== '#') {
+        const targetId = href.substring(1);
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          e.preventDefault();
+          targetEl.scrollIntoView({ behavior: 'smooth' });
+          if (targetEl.hasAttribute('tabindex')) {
+            targetEl.focus();
+          }
+        }
+      }
+    });
+  });
+}
+
+// Listener para botones de servicios que preseleccionan en cotizador (FASE 5)
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.btn-cotizar-service').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const srv = btn.getAttribute('data-preselect-service');
+      if (srv) {
+        const wizard = document.getElementById('quoteWizard');
+        if (wizard) {
+          const radio = wizard.querySelector(`input[name="wizQueMover"][value="${srv}"]`);
+          if (radio) {
+            radio.checked = true;
+            wizard.querySelectorAll('.que-mover-card').forEach(c => c.classList.remove('selected'));
+            radio.closest('.que-mover-card')?.classList.add('selected');
+            if (typeof quoteData !== 'undefined') {
+              quoteData.queMover = srv;
+              if (typeof updateQuoteSummary === 'function') updateQuoteSummary();
+            }
+          }
+        }
+      }
+    });
+  });
+});
